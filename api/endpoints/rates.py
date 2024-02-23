@@ -1,5 +1,12 @@
 import os
 from fastapi import APIRouter
+
+from db.schemas import (
+    LatestExchangeRateResponse,
+    CurrencyConversionResponse,
+    ExchangeRateModel,
+    SuccessResponse
+)
 from utils.fetch_save import fetch_rates, save_rates
 
 from fastapi import HTTPException, Depends
@@ -22,8 +29,10 @@ async def get_session() -> AsyncSession:
         yield session
 
 
-@router.post("/save-or-update-rates/")
-async def fetch_and_store_rates(session: AsyncSession = Depends(get_session)):
+@router.post("/save-or-update-rates/",
+             response_model=SuccessResponse)
+async def fetch_and_store_rates(
+        session: AsyncSession = Depends(get_session)):
     api_key = os.getenv("API_KEY")
     url = f'http://api.exchangeratesapi.io/v1/latest?access_key={api_key}'
     data = await fetch_rates(url)
@@ -31,7 +40,8 @@ async def fetch_and_store_rates(session: AsyncSession = Depends(get_session)):
     return {"success": "Data added successfully"}
 
 
-@router.get("/convert/")
+@router.get("/convert/",
+            response_model=CurrencyConversionResponse)
 async def convert_endpoint(
         from_currency: str,
         to_currency: str,
@@ -48,8 +58,10 @@ async def convert_endpoint(
     }
 
 
-@router.get("/latest-exchange-rate/")
-async def get_latest_rate(session: AsyncSession = Depends(get_session)):
+@router.get("/latest-exchange-rate/",
+            response_model=LatestExchangeRateResponse)
+async def get_latest_rate(
+        session: AsyncSession = Depends(get_session)):
     async with session.begin():
         stmt = select(ExchangeRate).order_by(
             ExchangeRate.updated_datetime.desc()).limit(1)
@@ -61,6 +73,8 @@ async def get_latest_rate(session: AsyncSession = Depends(get_session)):
                                 detail="No exchange rates found")
 
         return {
-            "created_datetime": latest_exchange_rate.created_datetime,
-            "updated_datetime": latest_exchange_rate.updated_datetime
+            "created_datetime":
+                latest_exchange_rate.created_datetime,
+            "updated_datetime":
+                latest_exchange_rate.updated_datetime
         }
